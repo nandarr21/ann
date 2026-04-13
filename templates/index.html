@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PrediksiMiskin.id — Prediksi Kemiskinan dengan ANN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #080c14;
+    --surface: #0d1422;
+    --surface2: #131b2e;
+    --border: #1e2d48;
+    --accent: #00d4ff;
+    --accent2: #ff6b35;
+    --accent3: #7cfc00;
+    --text: #e8edf5;
+    --text-muted: #6b7fa3;
+    --danger: #ff4757;
+    --success: #2ed573;
+    --mono: 'Space Mono', monospace;
+    --sans: 'DM Sans', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Grid BG ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── Header ── */
+  header {
+    position: relative;
+    z-index: 10;
+    padding: 20px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    background: rgba(8,12,20,0.9);
+    backdrop-filter: blur(12px);
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .logo-icon {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, var(--accent), #0057ff);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+
+  .logo-text {
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  .logo-sub {
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 1px;
+  }
+
+  .header-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 6px 14px;
+    border-radius: 20px;
+  }
+
+  .status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: {% if model_ready %}var(--success){% else %}var(--accent2){% endif %};
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* ── Hero ── */
+  .hero {
+    position: relative;
+    z-index: 5;
+    text-align: center;
+    padding: 60px 40px 40px;
+  }
+
+  .hero-tag {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--accent);
+    border: 1px solid rgba(0,212,255,0.3);
+    padding: 4px 16px;
+    border-radius: 20px;
+    margin-bottom: 20px;
+  }
+
+  .hero h1 {
+    font-size: clamp(28px, 5vw, 52px);
+    font-weight: 600;
+    line-height: 1.15;
+    margin-bottom: 16px;
+    letter-spacing: -1px;
+  }
+
+  .hero h1 span {
+    background: linear-gradient(90deg, var(--accent), #7b61ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .hero p {
+    color: var(--text-muted);
+    font-size: 15px;
+    max-width: 500px;
+    margin: 0 auto 32px;
+    line-height: 1.7;
+  }
+
+  /* ── Stats row ── */
+  .stats-row {
+    position: relative; z-index: 5;
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    padding: 0 40px 48px;
+    flex-wrap: wrap;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 24px;
+    text-align: center;
+    min-width: 130px;
+    transition: border-color 0.2s;
+  }
+
+  .stat-card:hover { border-color: var(--accent); }
+
+  .stat-num {
+    font-family: var(--mono);
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--accent);
+  }
+
+  .stat-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 4px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  /* ── Main layout ── */
+  .main {
+    position: relative; z-index: 5;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 24px 80px;
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    gap: 24px;
+  }
+
+  @media (max-width: 900px) {
+    .main { grid-template-columns: 1fr; }
+  }
+
+  /* ── Panel ── */
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+  }
+
+  .panel-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .panel-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* ── Form ── */
+  .form-group {
+    margin-bottom: 20px;
+  }
+
+  label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  select, input[type="number"] {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    padding: 12px 16px;
+    border-radius: 10px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+
+  select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%236b7fa3' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    padding-right: 36px;
+  }
+
+  select:focus, input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(0,212,255,0.1);
+  }
+
+  .btn-predict {
+    width: 100%;
+    background: linear-gradient(135deg, var(--accent), #0095ff);
+    color: #000;
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 14px;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.15s;
+    margin-top: 4px;
+  }
+
+  .btn-predict:hover { opacity: 0.9; transform: translateY(-1px); }
+  .btn-predict:active { transform: translateY(0); }
+  .btn-predict:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* ── Result box ── */
+  .result-box {
+    margin-top: 24px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    display: none;
+    animation: fadeIn 0.4s ease;
+  }
+
+  .result-box.show { display: block; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .result-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+  }
+
+  .result-value {
+    font-family: var(--mono);
+    font-size: 40px;
+    font-weight: 700;
+    color: var(--accent2);
+    line-height: 1;
+  }
+
+  .result-value span {
+    font-size: 18px;
+    color: var(--text-muted);
+  }
+
+  .result-meta {
+    margin-top: 12px;
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.8;
+  }
+
+  .result-meta strong { color: var(--text); }
+
+  .category-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    margin-top: 8px;
+  }
+
+  .cat-rendah { background: rgba(46,213,115,0.15); color: var(--success); border: 1px solid rgba(46,213,115,0.3); }
+  .cat-sedang { background: rgba(255,165,0,0.15); color: orange; border: 1px solid rgba(255,165,0,0.3); }
+  .cat-tinggi { background: rgba(255,71,87,0.15); color: var(--danger); border: 1px solid rgba(255,71,87,0.3); }
+
+  /* ── Method info ── */
+  .method-info {
+    margin-top: 24px;
+    padding: 14px 16px;
+    background: rgba(0,212,255,0.05);
+    border: 1px solid rgba(0,212,255,0.15);
+    border-radius: 10px;
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.7;
+  }
+
+  .method-info strong { color: var(--accent); }
+
+  /* ── Chart panel ── */
+  .chart-area {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .chart-wrap {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+    flex: 1;
+  }
+
+  canvas { max-height: 280px; }
+
+  /* ── Ranking table ── */
+  .ranking-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+  }
+
+  .table-scroll { overflow-x: auto; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  thead th {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    padding: 8px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+
+  tbody tr {
+    border-bottom: 1px solid rgba(30,45,72,0.5);
+    transition: background 0.15s;
+    cursor: pointer;
+  }
+
+  tbody tr:hover { background: rgba(0,212,255,0.04); }
+
+  tbody td {
+    padding: 10px 12px;
+    color: var(--text);
+  }
+
+  .rank-num {
+    font-family: var(--mono);
+    color: var(--text-muted);
+    font-size: 11px;
+  }
+
+  .bar-inline {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .bar-track {
+    flex: 1;
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+  }
+
+  .trend-up { color: var(--danger); }
+  .trend-down { color: var(--success); }
+
+  /* ── Loading ── */
+  .loading {
+    display: none;
+    text-align: center;
+    padding: 20px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent);
+    letter-spacing: 2px;
+  }
+
+  .loading.show { display: block; }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  .loading span { animation: blink 0.8s infinite; }
+  .loading span:nth-child(2) { animation-delay: 0.2s; }
+  .loading span:nth-child(3) { animation-delay: 0.4s; }
+
+  /* ── Error ── */
+  .error-box {
+    display: none;
+    margin-top: 16px;
+    padding: 12px 16px;
+    background: rgba(255,71,87,0.1);
+    border: 1px solid rgba(255,71,87,0.3);
+    border-radius: 10px;
+    font-size: 13px;
+    color: var(--danger);
+  }
+
+  .error-box.show { display: block; }
+
+  /* ── Footer ── */
+  footer {
+    position: relative; z-index: 5;
+    text-align: center;
+    padding: 24px;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--text-muted);
+    font-family: var(--mono);
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">🧠</div>
+    <div>
+      <div class="logo-text">ANN Kemiskinan</div>
+      <div class="logo-sub">Artificial Neural Network · Indonesia</div>
+    </div>
+  </div>
+  <div class="header-badge">
+    <div class="status-dot"></div>
+</header>
+
+<!-- HERO -->
+<div class="hero">
+  <h1>Prediksi <span>Kemiskinan</span><br>berbasis Artificial Neural Network</h1>
+  <p>Model ANN dilatih menggunakan data BPS — persentase penduduk miskin per provinsi di Indonesia dari tahun 2010 hingga 2024.</p>
+</div>
+
+<!-- STATS -->
+<div class="stats-row">
+  <div class="stat-card">
+    <div class="stat-num">{{ total_data }}</div>
+    <div class="stat-label">Total Data</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num">38</div>
+    <div class="stat-label">Provinsi</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num">15</div>
+    <div class="stat-label">Tahun (2010–2024)</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num" id="modelLabel">{{ 'ANN' if model_ready else 'Poly' }}</div>
+    <div class="stat-label">Model Aktif</div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- LEFT: Form Prediksi -->
+  <div>
+    <div class="panel">
+      <div class="panel-title">Input Prediksi</div>
+
+      <div class="form-group">
+        <label>Provinsi</label>
+        <select id="selectProvinsi">
+          <option value="">-- Pilih Provinsi --</option>
+          {% for p in provinces %}
+          <option value="{{ p }}">{{ p }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Tahun Prediksi</label>
+        <input type="number" id="inputTahun"
+               min="{{ tahun_min }}" max="{{ tahun_max }}"
+               value="2026" placeholder="2026">
+      </div>
+
+      <button class="btn-predict" id="btnPredict" onclick="doPredict()">
+        Jalankan Prediksi
+      </button>
+
+      <div class="loading" id="loading">
+        <span>▮</span><span>▮</span><span>▮</span> MEMPROSES
+      </div>
+
+      <div class="error-box" id="errorBox"></div>
+
+      <!-- Result -->
+      <div class="result-box" id="resultBox">
+        <div class="result-label">Persentase Penduduk Miskin</div>
+        <div class="result-value" id="resultValue">—<span>%</span></div>
+        <div id="categoryBadge"></div>
+        <div class="result-meta" id="resultMeta"></div>
+      </div>
+    </div>
+
+
+  <!-- RIGHT: Charts + Ranking -->
+  <div class="chart-area">
+
+    <!-- Line Chart -->
+    <div class="chart-wrap">
+      <div class="panel-title">VISUALISASI</div>
+      <canvas id="lineChart"></canvas>
+    </div>
+
+    <!-- Ranking -->
+    <div class="ranking-wrap">
+      <div class="panel-title">Ranking Kemiskinan (Data Terbaru)</div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Provinsi</th>
+              <th>% Miskin</th>
+              <th>Bar</th>
+              <th>Tren 2010→2024</th>
+            </tr>
+          </thead>
+          <tbody id="rankingBody">
+            <tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:20px;">Memuat data...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
+<script>
+const chartData = {{ chart_data | tojson }};
+let lineChartInstance = null;
+
+// ── Load ranking table ─────────────────────────────────────────
+async function loadRanking() {
+  const res = await fetch('/all_data');
+  const data = await res.json();
+  const max = Math.max(...data.map(d => d.nilai_terakhir));
+  const tbody = document.getElementById('rankingBody');
+  tbody.innerHTML = data.map((d, i) => {
+    const pct = (d.nilai_terakhir / max * 100).toFixed(1);
+    const trendDir = d.trend < 0 ? 'trend-down' : 'trend-up';
+    const trendArrow = d.trend < 0 ? '▼' : '▲';
+    return `<tr onclick="selectProvince('${d.provinsi}')">
+      <td class="rank-num">${i+1}</td>
+      <td><strong>${d.provinsi}</strong></td>
+      <td style="font-family:var(--mono);color:var(--accent2)">${d.nilai_terakhir}%</td>
+      <td>
+        <div class="bar-inline">
+          <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+        </div>
+      </td>
+      <td class="${trendDir}">${trendArrow} ${Math.abs(d.trend).toFixed(2)}%</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Select province from table ─────────────────────────────────
+function selectProvince(nama) {
+  const sel = document.getElementById('selectProvinsi');
+  for (let opt of sel.options) {
+    if (opt.value === nama) { sel.value = nama; break; }
+  }
+  updateChartForProvince(nama, null, null);
+}
+
+// ── Update line chart ──────────────────────────────────────────
+function updateChartForProvince(provinsi, predTahun, predNilai) {
+  const d = chartData[provinsi];
+  if (!d) return;
+
+  const labels = [...d.tahun.map(String)];
+  const values = [...d.nilai];
+
+  if (predTahun && predNilai !== null) {
+    labels.push(String(predTahun) + ' ★');
+    values.push(null); // break line
+  }
+
+  const datasets = [
+    {
+      label: 'Data Aktual',
+      data: d.nilai,
+      borderColor: 'rgba(0,212,255,0.9)',
+      backgroundColor: 'rgba(0,212,255,0.08)',
+      pointBackgroundColor: 'rgba(0,212,255,1)',
+      pointRadius: 4,
+      borderWidth: 2,
+      fill: true,
+      tension: 0.35,
+    }
+  ];
+
+  if (predTahun && predNilai !== null) {
+    // Connect last historical point to prediction
+    const lastTahun = d.tahun[d.tahun.length - 1];
+    const lastNilai = d.nilai[d.nilai.length - 1];
+
+    datasets.push({
+      label: `Prediksi ${predTahun}`,
+      data: Array(d.tahun.length - 1).fill(null).concat([lastNilai, predNilai]),
+      borderColor: 'rgba(255,107,53,0.9)',
+      borderDash: [6, 3],
+      backgroundColor: 'rgba(255,107,53,0)',
+      pointBackgroundColor: ['rgba(0,0,0,0)', 'rgba(255,107,53,1)'],
+      pointRadius: [0, 8],
+      pointStyle: ['circle', 'star'],
+      borderWidth: 2,
+      tension: 0,
+    });
+  }
+
+  const fullLabels = predTahun ? [...d.tahun.map(String), String(predTahun)] : d.tahun.map(String);
+
+  if (lineChartInstance) lineChartInstance.destroy();
+
+  lineChartInstance = new Chart(document.getElementById('lineChart'), {
+    type: 'line',
+    data: { labels: fullLabels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: {
+          labels: { color: '#6b7fa3', font: { family: 'DM Sans', size: 12 } }
+        },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.parsed.y !== null ? ctx.parsed.y.toFixed(2) + '%' : ''}`,
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: '#6b7fa3', font: { family: 'Space Mono', size: 10 } },
+          grid: { color: 'rgba(30,45,72,0.6)' }
+        },
+        y: {
+          ticks: {
+            color: '#6b7fa3',
+            font: { family: 'Space Mono', size: 10 },
+            callback: v => v + '%'
+          },
+          grid: { color: 'rgba(30,45,72,0.6)' }
+        }
+      }
+    }
+  });
+}
+
+// ── Predict ────────────────────────────────────────────────────
+async function doPredict() {
+  const provinsi = document.getElementById('selectProvinsi').value;
+  const tahun = parseInt(document.getElementById('inputTahun').value);
+
+  // Validate
+  const errBox = document.getElementById('errorBox');
+  errBox.className = 'error-box';
+
+  if (!provinsi) {
+    errBox.textContent = '⚠ Pilih provinsi terlebih dahulu.';
+    errBox.className = 'error-box show';
+    return;
+  }
+  if (!tahun || tahun < 2000 || tahun > 2100) {
+    errBox.textContent = '⚠ Masukkan tahun yang valid (2000–2100).';
+    errBox.className = 'error-box show';
+    return;
+  }
+
+  // Show loading
+  document.getElementById('loading').className = 'loading show';
+  document.getElementById('resultBox').className = 'result-box';
+  document.getElementById('btnPredict').disabled = true;
+
+  try {
+    const res = await fetch('/predict', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provinsi, tahun })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error || 'Terjadi kesalahan server.');
+    }
+
+    // Show result
+    document.getElementById('resultValue').innerHTML =
+      `${data.prediksi}<span>%</span>`;
+
+    // Category
+    let catClass, catLabel;
+    if (data.prediksi < 5) { catClass = 'cat-rendah'; catLabel = '🟢 Sangat Rendah'; }
+    else if (data.prediksi < 10) { catClass = 'cat-rendah'; catLabel = '🟢 Rendah'; }
+    else if (data.prediksi < 15) { catClass = 'cat-sedang'; catLabel = '🟡 Sedang'; }
+    else if (data.prediksi < 20) { catClass = 'cat-sedang'; catLabel = '🟠 Tinggi'; }
+    else { catClass = 'cat-tinggi'; catLabel = '🔴 Sangat Tinggi'; }
+
+    document.getElementById('categoryBadge').innerHTML =
+      `<div class="category-badge ${catClass}">${catLabel}</div>`;
+
+    resultMeta.innerHTML = `
+  Provinsi: ${data.provinsi}<br>
+  Tahun: ${data.tahun}
+`;
+
+    document.getElementById('resultBox').className = 'result-box show';
+
+    // Update chart
+    updateChartForProvince(provinsi, tahun, data.prediksi);
+
+  } catch (e) {
+    errBox.textContent = '❌ ' + e.message;
+    errBox.className = 'error-box show';
+  } finally {
+    document.getElementById('loading').className = 'loading';
+    document.getElementById('btnPredict').disabled = false;
+  }
+}
+
+// ── Province select change → update chart ─────────────────────
+document.getElementById('selectProvinsi').addEventListener('change', e => {
+  if (e.target.value) updateChartForProvince(e.target.value, null, null);
+});
+
+// ── Init ──────────────────────────────────────────────────────
+loadRanking();
+// Default chart: Jawa Barat
+updateChartForProvince('JAWA BARAT', null, null);
+</script>
+</body>
+</html>
