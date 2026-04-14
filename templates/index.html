@@ -417,9 +417,9 @@
           </div>
 
           <div class="method-info" style="margin-top:16px;">
-            <strong>Metode:</strong> <span id="metodeLabel">—</span><br>
             Model memprediksi berdasarkan pola historis data BPS per provinsi.
           </div>
+          <div class="method-info" style="margin-top:16px; display:none;"></div>
 
           <!-- Tombol prediksi ulang -->
           <button class="btn-predict" style="margin-top:20px;" onclick="goBack()">
@@ -658,7 +658,7 @@
 
         // ─ Isi halaman 2 ─
         document.getElementById('resultValue').innerHTML = `${data.prediksi}<span>%</span>`;
-        document.getElementById('metodeLabel').textContent = data.metode || '—';
+       
 
         let catClass, catLabel;
         if (data.prediksi < 5) { catClass = 'cat-rendah'; catLabel = '🟢 Sangat Rendah'; }
